@@ -1,4 +1,5 @@
 from Tkinter import *
+import math
 import os
 root = Tk()
 image = "1.bmp"
@@ -13,8 +14,15 @@ gv = StringVar()
 gv.set("0")
 bv = StringVar()
 bv.set("0")
+frv = StringVar()
+frv.set("255")
+fgv = StringVar()
+fgv.set("255")
+fbv = StringVar()
+fbv.set("255")
 hx = []
 hy = []
+
 
 def nop():
     print "nothing happened"
@@ -182,6 +190,83 @@ def make_line(x1, y1, x2, y2):
             y = int(round(y))
             table[y][x] = color
 
+def make_rectangle(x1, y1, x2, y2):
+    global canv, table, rv, gv, bv, frv, fgv, fbv
+    if x1 > x2:
+        x1, x2 = x2, x1
+    if y1 > y2:
+        y1, y2 = y2, y1
+    r = eval(rv.get())
+    g = eval(gv.get())
+    b = eval(bv.get())
+    color = rgb(r, g, b)
+    fr = eval(frv.get())
+    fg = eval(fgv.get())
+    fb = eval(fbv.get())
+    fill_color = rgb(fr, fg, fb)
+    canv.create_rectangle(x1, y1, x2, y2, outline = color, fill = fill_color)
+    lc = (r << 16) + (g << 8) + b
+    fc = (fr << 16) + (fg << 8) + fb
+    for x in range(x1, x2 + 1):
+        for y in range(y1, y2 + 1):
+            if x == x1 or x == x2 or y == y1 or y == y2:
+                table[y][x] = lc
+            else:
+                table[y][x] = fc
+
+def make_oval(x1, y1, x2, y2):
+    global canv, table, rv, gv, bv, frv, fgv, fbv
+    if x1 > x2:
+        x1, x2 = x2, x1
+    if y1 > y2:
+        y1, y2 = y2, y1
+    r = eval(rv.get())
+    g = eval(gv.get())
+    b = eval(bv.get())
+    color = rgb(r, g, b)
+    fr = eval(frv.get())
+    fg = eval(fgv.get())
+    fb = eval(fbv.get())
+    fill_color = rgb(fr, fg, fb)
+    canv.create_oval(x1, y1, x2, y2, outline = color, fill = fill_color)
+    lc = (r << 16) + (g << 8) + b
+    fc = (fr << 16) + (fg << 8) + fb
+    cx = (x1 + x2) / 2.0
+    cy = (y1 + y2) / 2.0
+    a = (x2 - x1) / 2.0
+    b = (y2 - y1) / 2.0
+    for x in range(x1, x2 + 1):
+        for y in range(y1, y2 + 1):
+            t = (x - cx) ** 2 / a ** 2 + (y - cy) ** 2 / b ** 2
+            if t < 1:
+                table[y][x] = fc
+    for k in range(10000):
+        theta = k / 10000.0 * math.pi * 2
+        x = cx + a * math.cos(theta)
+        x = int(round(x))
+        y = cy + b * math.sin(theta)
+        y = int(round(y))
+        table[y][x] = lc
+
+def flood_fill(x0, y0, r, g, b):
+    d = [[1, 0], [-1, 0], [0, 1], [0, -1]]
+    visited = set()
+    c0 = table[y0][x0]
+    queue = [(x0, y0)]
+    p = 0
+    q = 0
+    while p <= q:
+        for i in range(4):
+            x = queue[p][0] + d[i][0]
+            y = queue[p][1] + d[i][1]
+            if x < 1 or x > 800 or y < 1 or y > 600 or (x, y) in visited or table[y][x] != c0:
+                continue
+            visited.add((x, y))
+            queue.append((x, y))
+            q += 1
+            put_pixel(x, y, r, g, b)
+        p += 1
+
 def check_state(event):
     global v, state
     if v.get() != state:
@@ -192,7 +277,7 @@ def check_state(event):
 def paint_start(event):
     x = event.x
     y = event.y
-    global hx, hy
+    global hx, hy, frv, fgv, fbv
     if v.get() == 1:
         hx = []
         hy = []
@@ -201,23 +286,73 @@ def paint_start(event):
     elif v.get() == 2:
         hx = [x]
         hy = [y]
+    elif v.get() == 3:
+        hx.append(x)
+        hy.append(y)
+    elif v.get() == 4:
+        hx = [x]
+        hy = [y]
+    elif v.get() == 5:
+        hx = [x]
+        hy = [y]
+    elif v.get() == 6:
+        r = eval(frv.get())
+        g = eval(fgv.get())
+        b = eval(fbv.get())
+        flood_fill(x, y, r, g, b)
 
 def paint_work(event):
     x = event.x
     y = event.y
-    global hx, hy, canv
+    global hx, hy, canv, rv, gv, bv, frv, fgv, fbv
     if v.get() == 1:
         make_line(hx[0], hy[0], x, y)
         hx[0] = x
         hy[0] = y
     elif v.get() == 2:
-        global tmp_image, rv, gv, bv
         r = eval(rv.get())
         g = eval(gv.get())
         b = eval(bv.get())
         color = rgb(r, g, b)
         canv.delete("tmp")
         canv.create_line(x, y, hx[0], hy[0], fill = color, tags = "tmp")
+    elif v.get() == 3:
+        r = eval(rv.get())
+        g = eval(gv.get())
+        b = eval(bv.get())
+        color = rgb(r, g, b)
+        canv.delete("tmp")
+        if len(hx) == 1:
+            hx.append(x)
+            hy.append(y)
+            canv.create_line(x, y, hx[0], hy[0], fill = color, tags = "tmp")
+        else:
+            n = len(hx)
+            hx[n - 1] = x
+            hy[n - 1] = y
+            canv.create_line(x, y, hx[n - 2], hy[n - 2], fill = color, tags = "tmp")
+    elif v.get() == 4:
+        r = eval(rv.get())
+        g = eval(gv.get())
+        b = eval(bv.get())
+        color = rgb(r, g, b)
+        fr = eval(frv.get())
+        fg = eval(fgv.get())
+        fb = eval(fbv.get())
+        fill_color = rgb(fr, fg, fb)
+        canv.delete("tmp")
+        canv.create_rectangle(x, y, hx[0], hy[0], outline = color, fill = fill_color, tags = "tmp")
+    elif v.get() == 5:
+        r = eval(rv.get())
+        g = eval(gv.get())
+        b = eval(bv.get())
+        color = rgb(r, g, b)
+        fr = eval(frv.get())
+        fg = eval(fgv.get())
+        fb = eval(fbv.get())
+        fill_color = rgb(fr, fg, fb)
+        canv.delete("tmp")
+        canv.create_oval(x, y, hx[0], hy[0], outline = color, fill = fill_color, tags = "tmp")
 
 def paint_end(event):
     x = event.x
@@ -230,9 +365,34 @@ def paint_end(event):
     elif v.get() == 2:
         canv.delete("tmp")
         make_line(hx[0], hy[0], x, y)
+        hx = []
+        hy = []
+    elif v.get() == 3:
+        canv.delete("tmp")
+        n = len(hx)
+        if n < 2:
+            hx = []
+            hy = []
+            return
+        make_line(hx[n - 1], hy[n - 1], hx[n - 2], hy[n - 2])
+    elif v.get() == 4:
+        canv.delete("tmp")
+        make_rectangle(hx[0], hy[0], x, y)
+        hx = []
+        hy = []
+    elif v.get() == 5:
+        canv.delete("tmp")
+        make_oval(hx[0], hy[0], x, y)
+        hx = []
+        hy = []
 
 def poly_end(event):
-    print "--poly--"
+    global hx, hy
+    n = len(hx)
+    if n > 1:
+        make_line(hx[0], hy[0], hx[n - 1], hy[n - 1])
+    hx = []
+    hy = []
 
 def main():
     global root
@@ -241,12 +401,23 @@ def main():
     global v, rv, gv, bv
     color_table = Frame(tool, width = 90, height = 100, bd = 4, relief = "groove")
     color_table.pack()
-    Label(color_table, text = "red value:").pack()
+    Label(color_table, text = "==Line color config==\nred value:").pack()
     Entry(color_table, textvariable = rv).pack()
     Label(color_table, text = "green value:").pack()
     Entry(color_table, textvariable = gv).pack()
     Label(color_table, text = "blue value:").pack()
     Entry(color_table, textvariable = bv).pack()
+    
+    global frv, fgv, fbv
+    fill_table = Frame(tool, width = 90, height = 100, bd = 4, relief = "groove")
+    fill_table.pack()
+    Label(fill_table, text = "==Fill color config==\nred value:").pack()
+    Entry(fill_table, textvariable = frv).pack()
+    Label(fill_table, text = "green value:").pack()
+    Entry(fill_table, textvariable = fgv).pack()
+    Label(fill_table, text = "blue value:").pack()
+    Entry(fill_table, textvariable = fbv).pack()
+    
     global canv
     canv = pack_main_table()
     model = Frame(tool, width = 90, height = 100, bd = 4, relief = "groove")
@@ -254,8 +425,9 @@ def main():
     Radiobutton(model, text = "Pencil", variable = v, value = 1).grid(sticky = W)
     Radiobutton(model, text = "Line", variable = v, value = 2).grid(sticky = W)
     Radiobutton(model, text = "Polygon", variable = v, value = 3).grid(sticky = W)
-    Radiobutton(model, text = "Oval", variable = v, value = 4).grid(sticky = W)
-    Radiobutton(model, text = "Rectangle", variable = v, value = 5).grid(sticky = W)
+    Radiobutton(model, text = "Rectangle", variable = v, value = 4).grid(sticky = W)
+    Radiobutton(model, text = "Oval", variable = v, value = 5).grid(sticky = W)
+    Radiobutton(model, text = "Filler", variable = v, value = 6).grid(sticky = W)
     Button(tool, text = "Clear", command = clear_screen).pack()
     Button(tool, text = "Quit", command = end).pack()
     tool.update()
