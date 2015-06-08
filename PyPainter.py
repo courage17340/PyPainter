@@ -3,9 +3,10 @@ import os
 root = Tk()
 image = "1.bmp"
 canv = 0
-table = [[16777215 for col in range(802)] for row in range(602)]
+table = [[0xffffff for col in range(802)] for row in range(602)]
 v = IntVar()
 v.set(1)
+state = 1
 rv = StringVar()
 rv.set("0")
 gv = StringVar()
@@ -25,16 +26,10 @@ def end():
 def rgb(r, g, b):
     return "#%02x%02x%02x" % (r, g, b)
 
-def get_rgb():
-    global rv, gv, bv
-    r = eval(rv.get())
-    g = eval(gv.get())
-    b = eval(bv.get())
-    return rgb(r, g, b)
-
 def put_pixel(x, y, r, g, b):
-    global canv
-    return canv.create_line(x, y, x + 1, y, fill = rgb(r, g, b))
+    global canv, table
+    table[y][x] = (r << 16) + (g << 8) + b
+    canv.create_line(x, y, x + 1, y, fill = rgb(r, g, b))
 
 def open_image():
     global image
@@ -60,7 +55,7 @@ def open_image():
             g = ord(img.read(1))
             r = ord(img.read(1))
             put_pixel(i, j, r, g, b)
-            table[j][i] = (r << 16) + (g << 8) + b
+            #table[j][i] = (r << 16) + (g << 8) + b
         for i in range(t):
             empty = img.read(1)
     img.close()
@@ -101,7 +96,7 @@ def write_image():
     string += make_str(0, 4)
     string += make_str(0, 4)
     #===data====
-    #global table
+    global table
     t -= width * 3
     for j in range(height, 0, -1):
         for i in range(1, width + 1):
@@ -113,7 +108,6 @@ def write_image():
     img.write(string)
     img.close()
     
-
 def pack_menu_list():
     global root
     m = Menu(root)
@@ -149,20 +143,93 @@ def clear_screen():
     global canv, root, table
     canv.destroy()
     canv = pack_main_table()
-    table = [[16777215 for col in range(802)] for row in range(602)]
+    table = [[0xffffff for col in range(802)] for row in range(602)]
     canv.bind("<Button-1>", paint_start)
     canv.bind("<B1-Motion>", paint_work)
     canv.bind("<ButtonRelease-1>", paint_end)
     canv.bind("<Double-Button-1>", poly_end)
 
+def make_line(x1, y1, x2, y2):
+    global canv, table, rv, gv, bv
+    if x1 > x2:
+        x1, x2 = x2, x1
+        y1, y2 = y2, y1
+    elif x1 == x2 and y1 > y2:
+        y1, y2 = y2, y1
+    r = eval(rv.get())
+    g = eval(gv.get())
+    b = eval(bv.get())
+    color = (r << 16) + (g << 8) + b
+    canv.create_line(x1, y1, x2, y2, fill = rgb(r, g, b))
+    if abs(x1 - x2) <= abs(y1 - y2):
+        if y1 == y2:
+            y = y1
+            x = x1
+            table[y][x] = color
+        elif y1 < y2:
+            for y in range(y1, y2 + 1):
+                x = (y - y1 + 0.0) / (y2 - y1) * (x2 - x1) + x1
+                x = int(round(x))
+                table[y][x] = color
+        else:
+            for y in range(y2, y1 + 1):
+                x = (y - y1 + 0.0) / (y2 - y1) * (x2 - x1) + x1
+                x = int(round(x))
+                table[y][x] = color
+    else:
+        for x in range(x1, x2 + 1):
+            y = (x - x1 + 0.0)/ (x2 - x1) * (y2 - y1) + y1
+            y = int(round(y))
+            table[y][x] = color
+
+def check_state(event):
+    global v, state
+    if v.get() != state:
+        state = v.get()
+        hx = []
+        hy = []
+
 def paint_start(event):
-    print "--start--"
+    x = event.x
+    y = event.y
+    global hx, hy
+    if v.get() == 1:
+        hx = []
+        hy = []
+        hx.append(x)
+        hy.append(y)
+    elif v.get() == 2:
+        hx = [x]
+        hy = [y]
 
 def paint_work(event):
-    print "--work--"
+    x = event.x
+    y = event.y
+    global hx, hy, canv
+    if v.get() == 1:
+        make_line(hx[0], hy[0], x, y)
+        hx[0] = x
+        hy[0] = y
+    elif v.get() == 2:
+        global tmp_image, rv, gv, bv
+        r = eval(rv.get())
+        g = eval(gv.get())
+        b = eval(bv.get())
+        color = rgb(r, g, b)
+        canv.delete("tmp")
+        canv.create_line(x, y, hx[0], hy[0], fill = color, tags = "tmp")
 
 def paint_end(event):
-    print "--end--"
+    x = event.x
+    y = event.y
+    global hx, hy
+    if v.get() == 1:
+        make_line(hx[0], hy[0], x, y)
+        hx[0] = x
+        hy[0] = y
+    elif v.get() == 2:
+        canv.delete("tmp")
+        make_line(hx[0], hy[0], x, y)
 
 def poly_end(event):
     print "--poly--"
@@ -172,14 +239,14 @@ def main():
     menu = pack_menu_list()
     tool = pack_tool_list()
     global v, rv, gv, bv
-    color = Frame(tool, width = 90, height = 100, bd = 4, relief = "groove")
-    color.pack()
-    Label(color, text = "red value:").pack()
-    Entry(color, textvariable = rv).pack()
-    Label(color, text = "green value:").pack()
-    Entry(color, textvariable = gv).pack()
-    Label(color, text = "blue value:").pack()
-    Entry(color, textvariable = bv).pack()
+    color_table = Frame(tool, width = 90, height = 100, bd = 4, relief = "groove")
+    color_table.pack()
+    Label(color_table, text = "red value:").pack()
+    Entry(color_table, textvariable = rv).pack()
+    Label(color_table, text = "green value:").pack()
+    Entry(color_table, textvariable = gv).pack()
+    Label(color_table, text = "blue value:").pack()
+    Entry(color_table, textvariable = bv).pack()
     global canv
     canv = pack_main_table()
     model = Frame(tool, width = 90, height = 100, bd = 4, relief = "groove")
@@ -192,6 +259,7 @@ def main():
     Button(tool, text = "Clear", command = clear_screen).pack()
     Button(tool, text = "Quit", command = end).pack()
     tool.update()
+    tool.bind("<Leave>",check_state)
     canv.bind("<Button-1>", paint_start)
     canv.bind("<B1-Motion>", paint_work)
     canv.bind("<ButtonRelease-1>", paint_end)
