@@ -5,6 +5,8 @@ root = Tk()
 image = "1.bmp"
 canv = 0
 table = [[0xffffff for col in range(802)] for row in range(602)]
+visited = [[0 for col in range(602)] for row in range(802)]
+queue = [[0 for col in range(2)] for row in range(480002)]
 v = IntVar()
 v.set(1)
 state = 1
@@ -22,7 +24,16 @@ fbv = StringVar()
 fbv.set("255")
 hx = []
 hy = []
-
+open_window = 0
+save_window = 0
+help_window = 0
+about_window = 0
+ov = StringVar()
+ov.set("1.bmp")
+sv = StringVar()
+sv.set("2.bmp")
+help_str = "Just use it"
+about_str = "Pypainter V1.0\nMade by Chu Wei\nAll rights reserved"
 
 def nop():
     print "nothing happened"
@@ -40,7 +51,8 @@ def put_pixel(x, y, r, g, b):
     canv.create_line(x, y, x + 1, y, fill = rgb(r, g, b))
 
 def open_image():
-    global image
+    global ov
+    image = ov.get()
     if not os.path.exists(image):
         print "No such file"
         return
@@ -67,6 +79,9 @@ def open_image():
         for i in range(t):
             empty = img.read(1)
     img.close()
+    global open_window
+    open_window.destroy()
+    open_window = 0
 
 def make_str(x, num):
     s = ""
@@ -75,8 +90,10 @@ def make_str(x, num):
         x >>= 8
     return s
 
-def write_image():
-    img = open("2.bmp", "wb")
+def save_image():
+    global sv
+    image = sv.get()
+    img = open(image, "wb")
     global canv
     width = canv.winfo_width() - 4
     height = canv.winfo_height() - 4
@@ -115,7 +132,62 @@ def write_image():
     #===end===
     img.write(string)
     img.close()
-    
+    global save_window
+    save_window.destroy()
+    save_window = 0
+
+def show_open_window():
+    global open_window, ov
+    if open_window != 0:
+        open_window.destory()
+    open_window = Toplevel()
+    open_window.title("Open file")
+    Label(open_window, text = "Input file name:").pack()
+    Entry(open_window, textvariable = ov).pack()
+    Button(open_window, text = "OK", command = open_image).pack()
+
+def show_save_window():
+    global save_window, sv
+    if save_window != 0:
+        save_window.destroy()
+    save_window = Toplevel()
+    save_window.title("Save file")
+    Label(save_window, text = "Input file name:").pack()
+    Entry(save_window, textvariable = sv).pack()
+    Button(save_window, text = "OK", command = save_image).pack()
+
+def end_help():
+    global help_window
+    if help_window != 0:
+        help_window.destroy()
+    help_window = 0
+
+def show_help_window():
+    global help_window
+    if help_window != 0:
+        help_window.destroy()
+    help_window = Toplevel()
+    help_window.title("Help")
+    help_window.geometry("200x200")
+    Label(help_window, text = help_str).pack()
+    Button(help_window, text = "OK", command = end_help).pack()
+
+def end_about():
+    global about_window
+    if about_window != 0:
+        about_window.destroy()
+    about_window = 0
+
+def show_about_window():
+    global about_window
+    if about_window != 0:
+        about_window.destroy()
+    about_window = Toplevel()
+    about_window.title("About")
+    about_window.geometry("200x200")
+    Label(about_window, text = about_str).pack()
+    Button(about_window, text = "OK", command = end_about).pack()
+
 def pack_menu_list():
     global root
     m = Menu(root)
@@ -123,16 +195,16 @@ def pack_menu_list():
     #===file===
     filemenu = Menu(m)
     m.add_cascade(label = "File", menu = filemenu)
-    filemenu.add_command(label = "New", command = nop)
-    filemenu.add_command(label = "Open...", command = open_image)
-    filemenu.add_command(label = "Save As...", command = write_image)
+#    filemenu.add_command(label = "New", command = nop)
+    filemenu.add_command(label = "Open...", command = show_open_window)
+    filemenu.add_command(label = "Save...", command = show_save_window)
     filemenu.add_separator()
     filemenu.add_command(label = "Exit", command = end)
     #===help===
     helpmenu = Menu(m)
     m.add_cascade(label = "Help", menu = helpmenu)
-    helpmenu.add_command(label = "Help", command = nop)
-    helpmenu.add_command(label = "About", command = nop)
+    helpmenu.add_command(label = "Help", command = show_help_window)
+    helpmenu.add_command(label = "About", command = show_about_window)
     #===return===
     return m
 
@@ -249,22 +321,28 @@ def make_oval(x1, y1, x2, y2):
         table[y][x] = lc
 
 def flood_fill(x0, y0, r, g, b):
+    global visited, queue
+    visited = [[0 for col in range(802)] for row in range(602)]
     d = [[1, 0], [-1, 0], [0, 1], [0, -1]]
-    visited = set()
     c0 = table[y0][x0]
-    queue = [(x0, y0)]
+    queue[0] = [x0, y0]
     p = 0
     q = 0
+    count = 0
     while p <= q:
         for i in range(4):
             x = queue[p][0] + d[i][0]
             y = queue[p][1] + d[i][1]
-            if x < 1 or x > 800 or y < 1 or y > 600 or (x, y) in visited or table[y][x] != c0:
+            if x < 1 or x > 800 or y < 1 or y > 600 or visited[x][y] or table[y][x] != c0:
                 continue
-            visited.add((x, y))
-            queue.append((x, y))
+            visited[x][y] = 1
             q += 1
+            queue[q][0] = x
+            queue[q][1] = y
             put_pixel(x, y, r, g, b)
+            count += 1
+            if (count & 1023) == 0:
+                canv.update()
         p += 1
 
 def check_state(event):
