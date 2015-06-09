@@ -32,8 +32,8 @@ ov = StringVar()
 ov.set("1.bmp")
 sv = StringVar()
 sv.set("2.bmp")
-help_str = "Just use it"
-about_str = "Pypainter V1.0\nMade by Chu Wei\nAll rights reserved"
+help_str = "1.Color\n*Color is represented by RGB value.\n*Each value is between 0 and 255.\n2.Paint\n*Use them like that in MSPaint.\n3.Warning\n*Filler is very slow, please use it carefully.\n4.Hint\n*For detailed help, please read report.pdf."
+about_str = "PyPainter V1.2\nMade by Chu Wei\n2015.6.9"
 
 def nop():
     print "nothing happened"
@@ -68,16 +68,28 @@ def open_image():
     if t < width * 3:
         t += 4
     t -= width * 3
+    global canv, table
+    canv.destroy()
+    canv = pack_main_table()
+    table = [[0xffffff for col in range(802)] for row in range(602)]
+    canv.bind("<Button-1>", paint_start)
+    canv.bind("<B1-Motion>", paint_work)
+    canv.bind("<ButtonRelease-1>", paint_end)
+    canv.bind("<Double-Button-1>", poly_end)
+    buf = img.read()
+    ptr = -1
     #global table
     for j in range(height, 0, -1):
         for i in range(1, width + 1):
-            b = ord(img.read(1))
-            g = ord(img.read(1))
-            r = ord(img.read(1))
-            put_pixel(i, j, r, g, b)
-            #table[j][i] = (r << 16) + (g << 8) + b
+            b = ord(buf[ptr + 1])
+            g = ord(buf[ptr + 2])
+            r = ord(buf[ptr + 3])
+            ptr += 3
+            if table[j][i] != (r << 16) + (g << 8) + b:
+                put_pixel(i, j, r, g, b)
+            table[j][i] = (r << 16) + (g << 8) + b
         for i in range(t):
-            empty = img.read(1)
+            ptr += 1
     img.close()
     global open_window
     open_window.destroy()
@@ -168,8 +180,9 @@ def show_help_window():
         help_window.destroy()
     help_window = Toplevel()
     help_window.title("Help")
-    help_window.geometry("200x200")
-    Label(help_window, text = help_str).pack()
+    help_window.geometry("300x200")
+    Label(help_window, text = "===Brief help===").pack()
+    Label(help_window, text = help_str, justify = "left").pack()
     Button(help_window, text = "OK", command = end_help).pack()
 
 def end_about():
@@ -184,7 +197,7 @@ def show_about_window():
         about_window.destroy()
     about_window = Toplevel()
     about_window.title("About")
-    about_window.geometry("200x200")
+    about_window.geometry("200x100")
     Label(about_window, text = about_str).pack()
     Button(about_window, text = "OK", command = end_about).pack()
 
@@ -383,6 +396,8 @@ def paint_work(event):
     x = event.x
     y = event.y
     global hx, hy, canv, rv, gv, bv, frv, fgv, fbv
+    if len(hx) == 0:
+        return
     if v.get() == 1:
         make_line(hx[0], hy[0], x, y)
         hx[0] = x
@@ -436,10 +451,12 @@ def paint_end(event):
     x = event.x
     y = event.y
     global hx, hy
+    if len(hx) == 0:
+        return
     if v.get() == 1:
         make_line(hx[0], hy[0], x, y)
-        hx[0] = x
-        hy[0] = y
+        hx = []
+        hy = []
     elif v.get() == 2:
         canv.delete("tmp")
         make_line(hx[0], hy[0], x, y)
@@ -455,16 +472,25 @@ def paint_end(event):
         make_line(hx[n - 1], hy[n - 1], hx[n - 2], hy[n - 2])
     elif v.get() == 4:
         canv.delete("tmp")
-        make_rectangle(hx[0], hy[0], x, y)
+        if x == hx[0] or y == hy[0]:
+            make_line(hx[0], hy[0], x, y)
+        else:
+            make_rectangle(hx[0], hy[0], x, y)
         hx = []
         hy = []
     elif v.get() == 5:
         canv.delete("tmp")
-        make_oval(hx[0], hy[0], x, y)
+        if x == hx[0] or y == hy[0]:
+            make_line(hx[0], hy[0], x, y)
+        else:
+            make_oval(hx[0], hy[0], x, y)
         hx = []
         hy = []
 
 def poly_end(event):
+    global v
+    if v.get() != 3:
+        return
     global hx, hy
     n = len(hx)
     if n > 1:
